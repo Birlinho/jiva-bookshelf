@@ -60,13 +60,14 @@ The build files will be created in the `build` directory.
 
 - React
 - Tailwind CSS
-- Node.js (Backend)
+- FastAPI (Backend)
+- MySQL (Database)
 
 ## 📝 Project Structure
 
 ```
 jive-landing-page/
-├── backend/         # Backend server files
+├── backend/         # FastAPI backend server files
 ├── public/          # Public assets
 ├── src/             # Source files
 │   ├── components/  # React components
