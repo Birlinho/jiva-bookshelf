@@ -13,8 +13,26 @@ A modern and responsive landing page built with React and Tailwind CSS. This pro
 
 Before you begin, ensure you have the following installed:
 
+### Frontend Requirements
+
 - Node.js (v14 or higher)
 - npm (v6 or higher)
+
+### Backend Requirements
+
+- Python (v3.8 or higher)
+- pip (Python package manager)
+- MySQL Server (v8.0 or higher)
+
+### Python Packages
+
+```bash
+pip install fastapi
+pip install uvicorn
+pip install sqlalchemy
+pip install mysql-connector-python
+pip install python-dotenv
+```
 
 ## 🛠️ Installation
 
