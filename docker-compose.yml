@@ -18,3 +18,8 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=sqlite:///./books.db
+    volumes:
+      - sqlite_data:/app
+
+volumes:
+  sqlite_data:
