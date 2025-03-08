@@ -13,10 +13,15 @@ function Books() {
   const fetchBooks = async () => {
     try {
       const response = await fetch("http://localhost:8000/api/books");
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const data = await response.json();
-      setBooks(data);
+      // Ensure we always have an array
+      setBooks(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching books:", error);
+      setBooks([]); // Set empty array on error
     }
   };
 

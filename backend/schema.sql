@@ -2,23 +2,30 @@
 DROP TABLE IF EXISTS books;
 
 -- Create the books table
-CREATE TABLE books (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(255) NOT NULL,
-    author VARCHAR(255) NOT NULL,
-    description TEXT,
-    price DECIMAL(10, 2),
-    image_url VARCHAR(2048),
+CREATE TABLE IF NOT EXISTS books (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    author TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    price REAL,
+    image_url TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Add indexes for common queries
-CREATE INDEX idx_title ON books(title);
-CREATE INDEX idx_author ON books(author);
+CREATE INDEX IF NOT EXISTS idx_title ON books(title);
+CREATE INDEX IF NOT EXISTS idx_author ON books(author);
 
--- Add example data
-INSERT INTO books (title, author, description, price) VALUES 
-    ('The Great Gatsby', 'F. Scott Fitzgerald', 'A story of decadence and excess', 19.99),
-    ('1984', 'George Orwell', 'A dystopian social science fiction', 15.99),
-    ('To Kill a Mockingbird', 'Harper Lee', 'A story of racial injustice', 12.99); 
+-- Add example data if the table is empty
+INSERT OR IGNORE INTO books (title, author, description, price) 
+SELECT 'The Great Gatsby', 'F. Scott Fitzgerald', 'A story of decadence and excess', 19.99
+WHERE NOT EXISTS (SELECT 1 FROM books LIMIT 1);
+
+INSERT OR IGNORE INTO books (title, author, description, price)
+SELECT '1984', 'George Orwell', 'A dystopian social science fiction', 15.99
+WHERE NOT EXISTS (SELECT 1 FROM books LIMIT 1);
+
+INSERT OR IGNORE INTO books (title, author, description, price)
+SELECT 'To Kill a Mockingbird', 'Harper Lee', 'A story of racial injustice', 12.99
+WHERE NOT EXISTS (SELECT 1 FROM books LIMIT 1); 

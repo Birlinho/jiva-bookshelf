@@ -2,10 +2,16 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
-from database import get_db_cursor
+from database import get_db_cursor, init_db
 import uvicorn
+import sqlite3
 
 app = FastAPI()
+
+# Initialize database on startup
+@app.on_event("startup")
+async def startup_event():
+    init_db()
 
 # Enable CORS
 app.add_middleware(
@@ -35,7 +41,22 @@ def get_books():
         with get_db_cursor() as cursor:
             cursor.execute("SELECT * FROM books ORDER BY created_at DESC")
             books = cursor.fetchall()
-            return books if books else []
+            
+            # Convert SQLite Row objects to dictionaries and ensure we return a list
+            if books is None:
+                return []
+                
+            book_list = []
+            for book in books:
+                book_dict = dict(book)
+                # Ensure all required fields are present
+                book_dict.setdefault('description', '')
+                book_dict.setdefault('price', None)
+                book_dict.setdefault('image_url', None)
+                book_list.append(book_dict)
+                
+            return book_list
+            
     except Exception as e:
         print(f"Error fetching books: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -50,40 +71,63 @@ def create_book(book: Book):
             # Insert the new book
             sql = """
                 INSERT INTO books (title, author, description, price, image_url)
-                VALUES (%s, %s, %s, %s, %s)
+                VALUES (?, ?, ?, ?, ?)
             """
-            values = (book.title, book.author, book.description, book.price, book.image_url)
+            values = (
+                book.title,
+                book.author,
+                book.description or '',  # Use empty string if None
+                book.price,
+                book.image_url
+            )
             print("Executing SQL:", sql.strip())
             print("With values:", values)
             
-            cursor.execute(sql, values)
-            book_id = cursor.lastrowid
+            try:
+                cursor.execute(sql, values)
+                book_id = cursor.lastrowid
+                print(f"Book inserted successfully with ID: {book_id}")
+            except sqlite3.Error as e:
+                print(f"SQLite error during insert: {e}")
+                raise HTTPException(status_code=500, detail=f"Database error during insert: {str(e)}")
             
-            # Fetch the created book with a new cursor to avoid result handling issues
-            cursor.execute("SELECT * FROM books WHERE id = %s", (book_id,))
-            created_book = cursor.fetchone()
-            
-            if created_book is None:
-                raise HTTPException(status_code=500, detail="Book was not created successfully")
-            
-            print("=== Book creation completed successfully ===\n")
-            return created_book
+            # Fetch the created book
+            try:
+                cursor.execute("SELECT * FROM books WHERE id = ?", (book_id,))
+                created_book = cursor.fetchone()
+                if created_book is None:
+                    raise HTTPException(status_code=500, detail="Book was not created successfully")
+                
+                # Convert to dictionary and ensure all fields are present
+                book_dict = dict(created_book)
+                book_dict.setdefault('description', '')
+                book_dict.setdefault('price', None)
+                book_dict.setdefault('image_url', None)
+                
+                print("=== Book creation completed successfully ===\n")
+                return book_dict
+                
+            except sqlite3.Error as e:
+                print(f"SQLite error during fetch: {e}")
+                raise HTTPException(status_code=500, detail=f"Database error during fetch: {str(e)}")
             
     except Exception as e:
         print("Error creating book:", str(e))
         print("Error type:", type(e))
         print("=== Book creation failed ===\n")
+        if isinstance(e, HTTPException):
+            raise e
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/books/{book_id}", response_model=Book)
 def get_book(book_id: int):
     try:
         with get_db_cursor() as cursor:
-            cursor.execute("SELECT * FROM books WHERE id = %s", (book_id,))
+            cursor.execute("SELECT * FROM books WHERE id = ?", (book_id,))
             book = cursor.fetchone()
             if book is None:
                 raise HTTPException(status_code=404, detail="Book not found")
-            return book
+            return dict(book)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -91,7 +135,7 @@ def get_book(book_id: int):
 def delete_book(book_id: int):
     try:
         with get_db_cursor(commit=True) as cursor:
-            cursor.execute("DELETE FROM books WHERE id = %s", (book_id,))
+            cursor.execute("DELETE FROM books WHERE id = ?", (book_id,))
             if cursor.rowcount == 0:
                 raise HTTPException(status_code=404, detail="Book not found")
             return {"message": "Book deleted successfully"}
@@ -104,8 +148,8 @@ def update_book(book_id: int, book: Book):
         with get_db_cursor(commit=True) as cursor:
             sql = """
                 UPDATE books 
-                SET title = %s, author = %s, description = %s, price = %s, image_url = %s
-                WHERE id = %s
+                SET title = ?, author = ?, description = ?, price = ?, image_url = ?
+                WHERE id = ?
             """
             values = (book.title, book.author, book.description, book.price, book.image_url, book_id)
             cursor.execute(sql, values)
@@ -114,9 +158,9 @@ def update_book(book_id: int, book: Book):
                 raise HTTPException(status_code=404, detail="Book not found")
                 
             # Fetch and return the updated book
-            cursor.execute("SELECT * FROM books WHERE id = %s", (book_id,))
+            cursor.execute("SELECT * FROM books WHERE id = ?", (book_id,))
             updated_book = cursor.fetchone()
-            return updated_book
+            return dict(updated_book)
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

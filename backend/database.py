@@ -1,32 +1,41 @@
-import mysql.connector
-from mysql.connector import Error
+import sqlite3
 from contextlib import contextmanager
+import os
 
 # Database configuration
-DB_CONFIG = {
-    'host': 'localhost',
-    'user': 'root',
-    'password': '',
-    'database': 'books',
-    'autocommit': True,
-    'consume_results': True  # Add this to handle unread results
-}
+DATABASE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "books.db")
+SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "schema.sql")
+
+def init_db():
+    """Initialize the database with schema"""
+    try:
+        print(f"Initializing database at {DATABASE_PATH}")
+        # Always execute schema to ensure tables exist
+        with get_db_connection() as conn:
+            print("Creating/updating database schema...")
+            with open(SCHEMA_PATH, 'r') as f:
+                schema_sql = f.read()
+                conn.executescript(schema_sql)
+            print("Database schema initialized successfully!")
+    except Exception as e:
+        print(f"Error initializing database: {e}")
+        raise
 
 @contextmanager
 def get_db_connection():
     """Context manager for database connections"""
     connection = None
     try:
-        print("Attempting to connect to MySQL database...")
-        connection = mysql.connector.connect(**DB_CONFIG)
-        print("Successfully connected to MySQL database!")
+        print("Connecting to SQLite database...")
+        connection = sqlite3.connect(DATABASE_PATH)
+        connection.row_factory = sqlite3.Row
+        print("Successfully connected to SQLite database!")
         yield connection
-    except Error as e:
-        print(f"Error connecting to MySQL: {e}")
-        print(f"Connection parameters: host={DB_CONFIG['host']}, user={DB_CONFIG['user']}, database={DB_CONFIG['database']}")
+    except Exception as e:
+        print(f"Error connecting to SQLite: {e}")
         raise
     finally:
-        if connection and connection.is_connected():
+        if connection:
             print("Closing database connection...")
             connection.close()
             print("Database connection closed.")
@@ -35,7 +44,7 @@ def get_db_connection():
 def get_db_cursor(commit=False):
     """Context manager for database cursors"""
     with get_db_connection() as connection:
-        cursor = connection.cursor(dictionary=True, buffered=True)  # Add buffered=True to handle results properly
+        cursor = connection.cursor()
         try:
             print(f"Created database cursor (commit={commit})")
             yield cursor
